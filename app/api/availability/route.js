@@ -22,7 +22,16 @@ export async function POST(req) {
     });
   });
 
+  
+
   for (const r of normalizedRules) {
+    // before inserting rules for a day
+  await supabase
+    .from('availability_rules')
+    .delete()
+    .eq('host_id', user.userId)
+    .eq('day_of_week', r.dayOfWeek);
+
     await supabase.from('availability_rules').insert({
       id: randomUUID(),
       host_id: user.userId,
