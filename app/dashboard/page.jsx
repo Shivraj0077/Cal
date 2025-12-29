@@ -1,7 +1,16 @@
+"use client"
+
+import { useRouter } from "next/navigation";
+
 export default function Dashboard() {
-    return (
+    const router = useRouter();
+    const handleOnClick = () => {
+        router.push("/availability");
+    }
+
+    return(
         <div>
-            Dashboard!
+            <button onClick={handleOnClick}>Go to availability</button>
         </div>
     )
 }

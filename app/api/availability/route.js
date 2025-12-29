@@ -2,6 +2,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { verifyToken } from '@/lib/auth';
 import { validateRule, normalizeRule } from '@/lib/availability';
 import { randomUUID } from 'crypto';
+import { validateNoOverlap } from '@/lib/validateNoOverlap';
 
 export async function POST(req) {
   const user = verifyToken(req);
@@ -22,15 +23,21 @@ export async function POST(req) {
     });
   });
 
-  
+  validateNoOverlap(
+    normalizedRules.map(r => ({
+      dayOfWeek: r.dayOfWeek,
+      startTime: r.startTime,
+      endTime: r.endTime,
+    }))
+  );
 
   for (const r of normalizedRules) {
     // before inserting rules for a day
-  await supabase
-    .from('availability_rules')
-    .delete()
-    .eq('host_id', user.userId)
-    .eq('day_of_week', r.dayOfWeek);
+    await supabase
+      .from('availability_rules')
+      .delete()
+      .eq('host_id', user.userId)
+      .eq('day_of_week', r.dayOfWeek);
 
     await supabase.from('availability_rules').insert({
       id: randomUUID(),
