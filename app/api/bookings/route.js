@@ -17,11 +17,23 @@ const toTime = m =>
  */
 export async function POST(req) {
     try {
-        const { hostId, guestName, guestEmail, date, startTime, duration } = await req.json();
+        const { hostId, eventTypeId, guestName, guestEmail, date, startTime, } = await req.json();
 
         if (!hostId || !guestName || !guestEmail || !date || !startTime || !duration) {
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
         }
+
+        const { data: eventType, error: eventTypeError } = await supabase
+        .from("event_types")
+        .select("*")
+        .eq("id", eventTypeId)
+        .single();
+
+        if(eventTypeError) {
+            return NextResponse.json({error: "Event type not found"}, {status: 500});
+        }
+
+        const { duration, buffer_before_min, buffer_after_min, min_notice_hours } = eventType;
 
         const startMin = toMinutes(startTime);
         const endMin = startMin + Number(duration);
