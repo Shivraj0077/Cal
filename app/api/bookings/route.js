@@ -35,6 +35,16 @@ export async function POST(req) {
 
         const { duration, buffer_before_min, buffer_after_min, min_notice_hours } = eventType;
 
+        //Minimum notice window logic
+        const now = new Date();
+        const bookingDateTime = new Date(date + 'T' + startTime);
+        const minNoticeMs = min_notice_hours * 60 * 1000;
+        if(bookingDateTime.getTime() - now.getTime() < minNoticeMs) {
+            return NextResponse.json(
+            {error: `Minimum ${minNoticeMs} minutes notice required`}, 
+            {status: 400});
+        }
+
         const startMin = toMinutes(startTime);
         const endMin = startMin + Number(duration);
         const endTimeStr = toTime(endMin);
@@ -42,7 +52,8 @@ export async function POST(req) {
         // 1. Check for overlapping bookings
         const { data: existingBookings, error: fetchError } = await supabase
             .from('bookings')
-            .select('*')
+            //this is for fetching all bookings for that date and that event's buffer cause buffers are store for events not for slots
+            .select('*, event_types(buffer_before_min, buffer_after_min)')
             .eq('host_id', hostId)
             .eq('date', date)
             .eq('status', 'confirmed');
@@ -51,14 +62,21 @@ export async function POST(req) {
             return NextResponse.json({ error: fetchError.message }, { status: 500 });
         }
 
-        const hasOverlap = existingBookings.some(b => {
-            const bStart = toMinutes(b.start_time);
-            const bEnd = toMinutes(b.end_time);
-            return (startMin < bEnd && endMin > bStart);
-        });
+        const newBookingStart = startMin - buffer_before_min; 
+        const newBookingEnd = endMin + buffer_after_min;
 
-        if (hasOverlap) {
-            return NextResponse.json({ error: 'Slot already booked' }, { status: 409 });
+        for(const booking of existingBookings) {
+            const existingBufferBefore = booking.event_types?.buffer_before_min || 0;
+            const existingBufferAfter = booking.event_types?.buffer_after_min || 0;
+
+            const existingStart = toMinutes(booking.start_time) - existingBufferBefore; 
+            const existingEnd = toMinutes(booking.end_time) + existingBufferAfter;
+
+            if(newBookingStart < existingEnd && newBookingEnd > existingStart) {
+                return NextResponse.json({ 
+                    error: 'Slot conflicts with existing booking (including buffers)' 
+                }, { status: 409 });
+            }
         }
 
         // 2. Insert booking
@@ -68,6 +86,7 @@ export async function POST(req) {
             .insert({
                 id: bookingId,
                 host_id: hostId,
+                event_type_id: eventTypeId,
                 guest_name: guestName,
                 guest_email: guestEmail,
                 date: date,
@@ -103,7 +122,7 @@ export async function GET(req) {
 
     let query = supabase
         .from('bookings')
-        .select('*')
+        .select('*, event_types(title, duration, buffer_before_min, buffer_after_min)')
         .eq('host_id', hostId);
 
     if (date) {
