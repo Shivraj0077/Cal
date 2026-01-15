@@ -4,113 +4,76 @@ import { useEffect, useState, use } from 'react';
 
 export default function BookingPage({ params }) {
     const { hostId } = use(params);
+    const [eventTypes, setEventTypes] = useState([]);
+    const [selectedType, setSelectedType] = useState(null);
     const [date, setDate] = useState('');
     const [slots, setSlots] = useState([]);
-    const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
-    const [selectedSlot, setSelectedSlot] = useState(null);
 
-    const DURATION = 30; // static 30 mins
+    // 1. Fetch event types available for this host
+    useEffect(() => {
+        async function fetchTypes() {
+            const res = await fetch(`/api/event-types?hostId=${hostId}`);
+            const data = await res.json();
+            setEventTypes(data || []);
+        }
+        fetchTypes();
+    }, [hostId]);
 
-    // Fetch slots when date changes
-    async function fetchSlots(selectedDate) {
+    // 2. Fetch slots based on selected date AND event type settings
+    async function fetchSlots(selectedDate, eventTypeId) {
         setLoading(true);
-        setError('');
-        setSlots([]);
-        setSelectedSlot(null);
-
         const res = await fetch(
-            `/api/availability/slots?hostId=${hostId}&date=${selectedDate}&duration=${DURATION}`
+            `/api/availability/slots?hostId=${hostId}&date=${selectedDate}&eventTypeId=${eventTypeId}`
         );
         const data = await res.json();
-
-        if (!res.ok) {
-            setError(data.error || 'Failed to fetch availability');
-            setLoading(false);
-            return;
-        }
-
-        if (!data.slots || data.slots.length === 0) {
-            setError('No availability for selected date');
-        } else {
-            setSlots(data.slots);
-        }
-
+        setSlots(data.slots || []);
         setLoading(false);
-    }
-
-    async function bookSlot() {
-        if (!selectedSlot) return;
-
-        const res = await fetch('/api/bookings', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                hostId,
-                guestName: 'Test User',
-                guestEmail: 'test@example.com',
-                date,
-                startTime: selectedSlot.start,
-                duration: DURATION
-            })
-        });
-
-        const data = await res.json();
-
-        if (!res.ok) {
-            alert(data.error || 'Booking failed');
-            return;
-        }
-
-        alert('Booking confirmed');
-        setSlots([]);
-        setSelectedSlot(null);
     }
 
     return (
         <div style={{ padding: 24 }}>
-            <h2>Book a Meeting</h2>
+            {!selectedType ? (
+                // Step 1: Select Event Type
+                <div>
+                    <h2>Choose a meeting type</h2>
+                    {eventTypes.map(type => (
+                        <button key={type.id} onClick={() => setSelectedType(type)} style={{ display: 'block', margin: '10px 0', padding: '20px', width: '200px' }}>
+                            <strong>{type.title}</strong><br />
+                            {type.duration} mins
+                        </button>
+                    ))}
+                </div>
+            ) : (
+                // Step 2: Select Date & Slot
+                <div>
+                    <button onClick={() => { setSelectedType(null); setSlots([]); }}>← Back</button>
+                    <h2>Booking: {selectedType.title} ({selectedType.duration} mins)</h2>
 
-            {/* Calendar */}
-            <input
-                type="date"
-                value={date}
-                min={new Date().toISOString().split('T')[0]}
-                onChange={e => {
-                    setDate(e.target.value);
-                    fetchSlots(e.target.value);
-                }}
-            />
-
-            {loading && <p>Loading availability...</p>}
-            {error && <p style={{ color: 'red' }}>{error}</p>}
-
-            {/* Slots */}
-            <div style={{ marginTop: 16 }}>
-                {slots.map((slot, i) => (
-                    <button
-                        key={i}
-                        onClick={() => setSelectedSlot(slot)}
-                        style={{
-                            margin: 4,
-                            padding: 8,
-                            border:
-                                selectedSlot?.start === slot.start
-                                    ? '2px solid black'
-                                    : '1px solid gray'
+                    <input
+                        type="date"
+                        value={date}
+                        min={new Date().toISOString().split("T")[0]}
+                        onChange={e => {
+                            setDate(e.target.value);
+                            fetchSlots(e.target.value, selectedType.id);
                         }}
-                    >
-                        {slot.start} – {slot.end}
-                    </button>
-                ))}
-            </div>
+                    />
 
-            {selectedSlot && (
-                <div style={{ marginTop: 16 }}>
-                    <p>
-                        Selected: {selectedSlot.start} – {selectedSlot.end}
-                    </p>
-                    <button onClick={bookSlot}>Confirm Booking</button>
+                    {loading && <p>Searching available times...</p>}
+
+                    <div style={{ marginTop: 20 }}>
+                        {slots.map((slot, i) => (
+                            <button key={i} style={{ margin: 5 }}>
+                                {slot.start}
+                            </button>
+                        ))}
+                    </div>
+                    <div>
+                        {slots.length == 0 && (<p>
+                            No slots available for this day!
+                        </p>)}
+                        </div>
                 </div>
             )}
         </div>

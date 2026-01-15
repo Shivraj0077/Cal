@@ -11,13 +11,13 @@ export async function POST(req) {
     }
 
     const body = await req.json();
-    const { 
-      title, 
-      description, 
-      duration, 
-      bufferBefore = 0, 
-      bufferAfter = 0, 
-      minNoticeHours = 0,
+    const {
+      title,
+      description,
+      duration,
+      bufferBefore = 0,
+      bufferAfter = 0,
+      minNoticeMins = 0,
     } = body;
 
     if (!title || !duration) {
@@ -34,7 +34,7 @@ export async function POST(req) {
         duration: Number(duration),
         buffer_before_min: Number(bufferBefore),
         buffer_after_min: Number(bufferAfter),
-        min_notice_hours: Number(minNoticeHours),
+        min_notice_mins: Number(minNoticeMins),
         is_active: true
       })
       .select()
@@ -53,10 +53,15 @@ export async function POST(req) {
 export async function GET(req) {
   try {
     const { searchParams } = new URL(req.url);
-    const hostId = searchParams.get('hostId');
+    let hostId = searchParams.get('hostId');
 
+    // If no hostId in query, we assume it's the host accessing their own dashboard
     if (!hostId) {
-      return Response.json({ error: 'hostId required' }, { status: 400 });
+      const user = verifyToken(req);
+      if (user.role !== 'HOST') {
+        return Response.json({ error: 'Forbidden' }, { status: 403 });
+      }
+      hostId = user.userId;
     }
 
     const { data, error } = await supabase
@@ -72,6 +77,7 @@ export async function GET(req) {
 
     return Response.json(data);
   } catch (err) {
+    // If verifyToken fails and there's no hostId, then return error
     return Response.json({ error: err.message }, { status: 500 });
   }
 }

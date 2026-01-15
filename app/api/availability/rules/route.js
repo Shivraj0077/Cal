@@ -8,13 +8,15 @@ export async function GET(req) {
             return Response.json({ error: 'Forbidden' }, { status: 403 });
         }
 
-        const { data, error } = await supabase.rpc(
-            'latest_weekly_rules',
-            { uid: user.userId }
-        )
+        const { data, error } = await supabase
+            .from('availability_rules')
+            .select('*')
+            .eq('host_id', user.userId)
+            .order('day_of_week')
+            .order('start_time');
 
         if (error) {
-            console.error('Supabase RPC error:', error);
+            console.error('Supabase error:', error);
             return Response.json({ error: error.message }, { status: 500 });
         }
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState} from 'react';
+import { useEffect, useState } from 'react';
 
 export default function AvailabilityPage() {
     const [weekly, setWeekly] = useState([]);
@@ -11,8 +11,8 @@ export default function AvailabilityPage() {
         endTime: ''
     });
 
-    function formatTime(timeStr){
-        if(!timeStr) '';
+    function formatTime(timeStr) {
+        if (!timeStr) '';
         const [hour, minute] = timeStr.split(":");
         const date = new Date()
         date.setHours(hour);
@@ -37,8 +37,8 @@ export default function AvailabilityPage() {
             headers: { 'Authorization': `Bearer ${token}` }
         }).then(r => r.json());
 
-        setWeekly(rules || []);
-        setOverrides(schedule.overrides || []);
+        setWeekly(Array.isArray(rules) ? rules : []);
+        setOverrides(Array.isArray(schedule.overrides) ? schedule.overrides : []);
     }
 
     useEffect(() => {

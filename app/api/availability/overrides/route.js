@@ -29,7 +29,7 @@ export async function POST(req) {
         if(!o.date){
             return Response.json({error: "Date is required"}, {status: 400});
         }
-        
+
         datesToDelete.add(o.date);
 
         if (!o.isAvailable) {
@@ -43,7 +43,7 @@ export async function POST(req) {
             continue;
         }
 
-        if (!o.starTime || !o.endTime) {
+        if (!o.startTime || !o.endTime) {
             return Response.json(
                 { error: 'startTime and endTime required for available override' },
                 { status: 403 });
@@ -96,8 +96,6 @@ export async function POST(req) {
         if (insertError) {
             return Response.json({ error: insertError.message }, { status: 500 });
         }
-
     }
-
     return Response.json({ success: true });
 }

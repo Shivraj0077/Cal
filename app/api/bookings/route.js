@@ -17,32 +17,32 @@ const toTime = m =>
  */
 export async function POST(req) {
     try {
-        const { hostId, eventTypeId, guestName, guestEmail, date, startTime, } = await req.json();
+        const { hostId, eventTypeId, guestName, guestEmail, date, startTime } = await req.json();
 
-        if (!hostId || !guestName || !guestEmail || !date || !startTime || !duration) {
+        if (!hostId || !eventTypeId || !guestName || !guestEmail || !date || !startTime) {
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
         }
 
         const { data: eventType, error: eventTypeError } = await supabase
-        .from("event_types")
-        .select("*")
-        .eq("id", eventTypeId)
-        .single();
+            .from("event_types")
+            .select("*")
+            .eq("id", eventTypeId)
+            .single();
 
-        if(eventTypeError) {
-            return NextResponse.json({error: "Event type not found"}, {status: 500});
+        if (eventTypeError) {
+            return NextResponse.json({ error: "Event type not found" }, { status: 500 });
         }
 
-        const { duration, buffer_before_min, buffer_after_min, min_notice_hours } = eventType;
+        const { duration, buffer_before_min, buffer_after_min, min_notice_mins } = eventType;
 
         //Minimum notice window logic
         const now = new Date();
         const bookingDateTime = new Date(date + 'T' + startTime);
-        const minNoticeMs = min_notice_hours * 60 * 1000;
-        if(bookingDateTime.getTime() - now.getTime() < minNoticeMs) {
+        const minNoticeMs = min_notice_mins * 60 * 1000;
+        if (bookingDateTime.getTime() - now.getTime() < minNoticeMs) {
             return NextResponse.json(
-            {error: `Minimum ${minNoticeMs} minutes notice required`}, 
-            {status: 400});
+                { error: `Minimum ${minNoticeMs} minutes notice required` },
+                { status: 400 });
         }
 
         const startMin = toMinutes(startTime);
@@ -62,19 +62,19 @@ export async function POST(req) {
             return NextResponse.json({ error: fetchError.message }, { status: 500 });
         }
 
-        const newBookingStart = startMin - buffer_before_min; 
+        const newBookingStart = startMin - buffer_before_min;
         const newBookingEnd = endMin + buffer_after_min;
 
-        for(const booking of existingBookings) {
+        for (const booking of existingBookings) {
             const existingBufferBefore = booking.event_types?.buffer_before_min || 0;
             const existingBufferAfter = booking.event_types?.buffer_after_min || 0;
 
-            const existingStart = toMinutes(booking.start_time) - existingBufferBefore; 
+            const existingStart = toMinutes(booking.start_time) - existingBufferBefore;
             const existingEnd = toMinutes(booking.end_time) + existingBufferAfter;
 
-            if(newBookingStart < existingEnd && newBookingEnd > existingStart) {
-                return NextResponse.json({ 
-                    error: 'Slot conflicts with existing booking (including buffers)' 
+            if (newBookingStart < existingEnd && newBookingEnd > existingStart) {
+                return NextResponse.json({
+                    error: 'Slot conflicts with existing booking (including buffers)'
                 }, { status: 409 });
             }
         }

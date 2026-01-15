@@ -18,9 +18,7 @@ export async function POST(req) {
       validateRule(rule);
       return normalizeRule({
         ...rule,
-        timezone,
-        buffer_before_min: rule.bufferBeforeMin || 0,
-        buffer_after_min: rule.bufferAfterMin || 0
+        timezone
       });
     });
 
@@ -51,9 +49,7 @@ export async function POST(req) {
         day_of_week: r.dayOfWeek,
         start_time: r.startTime,
         end_time: r.endTime,
-        timezone: r.timezone,
-        buffer_before_min: r.buffer_before_min,
-        buffer_after_min: r.buffer_after_min
+        timezone: r.timezone
       });
 
       if (insertError) {

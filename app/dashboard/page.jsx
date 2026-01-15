@@ -8,9 +8,15 @@ export default function Dashboard() {
         router.push("/availability");
     }
 
+    const handleEvent = () => {
+        router.push("/")
+    }
+
     return(
         <div>
             <button onClick={handleOnClick}>Go to availability</button>
+            <br/>
+            <button onClick={handleEvent}>Go to event types</button>
         </div>
     )
 }

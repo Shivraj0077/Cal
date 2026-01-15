@@ -33,12 +33,12 @@ export async function GET(req) {
         return NextResponse.json({ error: 'Event type not found' }, { status: 404 });
     }
 
-    const { duration, buffer_before_min, buffer_after_min, min_notice_hours } = eventType;
+    const { duration, buffer_before_min, buffer_after_min, min_notice_mins } = eventType;
 
     // 2. Check minimum notice window
     const now = new Date();
     const selectedDate = new Date(date + 'T00:00:00');
-    const minNoticeMs = min_notice_hours * 60 * 1000;
+    const minNoticeMs = min_notice_mins * 60 * 1000;
     const earliestBookingTime = new Date(now.getTime() + minNoticeMs);
 
     if (selectedDate < new Date(now.toDateString())) {
@@ -120,7 +120,7 @@ export async function GET(req) {
         while (cursor + totalSlotDuration <= segment.end) {
             const slotStartTime = cursor + buffer_before_min; // Actual meeting start
             const slotEndTime = slotStartTime + duration;
-            
+
             // Create datetime for minimum notice check
             const slotDateTime = new Date(date);
             slotDateTime.setHours(Math.floor(slotStartTime / 60));
@@ -134,7 +134,7 @@ export async function GET(req) {
                 });
             }
 
-            cursor += duration; // Move to next slot position
+            cursor += totalSlotDuration; // Move to next slot position (including buffers)
         }
     }
 
