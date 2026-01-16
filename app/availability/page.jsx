@@ -42,7 +42,9 @@ export default function AvailabilityPage() {
     }
 
     useEffect(() => {
-        fetchData();
+        (async () => {
+            await fetchData()
+        }) ();
     }, []);
 
     async function addRule() {

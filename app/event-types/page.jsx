@@ -44,8 +44,10 @@ export default function EventTypesPage() {
   }
 
   useEffect(() => {
-    fetchEventTypes();
-  }, []);
+    (async () => {
+      await fetchEventTypes()
+    }) ();
+  }, [])
 
   /* =========================
      Create event type
