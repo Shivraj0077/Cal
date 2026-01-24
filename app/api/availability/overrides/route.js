@@ -17,7 +17,19 @@ export async function POST(req) {
     }
 
     const body = await req.json();
-    const { overrides, timezone } = body;
+    const { overrides } = body;
+
+    // Fetch user's official timezone from DB
+    const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('timezone')
+        .eq('id', user.userId)
+        .single();
+
+    if (userError || !userData) {
+        return Response.json({ error: 'User profile not found' }, { status: 404 });
+    }
+    const timezone = userData.timezone;
     if (!Array.isArray(overrides)) {
         return Response.json({ error: "Invalid overrides" }, { status: 401 });
     }
@@ -26,8 +38,8 @@ export async function POST(req) {
     const datesToDelete = new Set();
 
     for (const o of overrides) {
-        if(!o.date){
-            return Response.json({error: "Date is required"}, {status: 400});
+        if (!o.date) {
+            return Response.json({ error: "Date is required" }, { status: 400 });
         }
 
         datesToDelete.add(o.date);
@@ -71,8 +83,8 @@ export async function POST(req) {
                 host_id: user.userId,
                 date: insertDate,
                 is_available: true,
-                start_time: r.startTime,
-                end_time: r.endTime,
+                start_time_utc: r.startTime,
+                end_time_utc: r.endTime,
                 timezone,
             });
         }

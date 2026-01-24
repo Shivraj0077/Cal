@@ -1,140 +1,257 @@
 // app/api/availability/slots/route.js
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabaseClient';
+import { zonedTimeToUTC, formatInTimezone, getDayBoundsInUTC } from '@/lib/timezone';
 
-const toMinutes = t => {
-    if (!t) return 0;
-    const [h, m] = t.split(':').map(Number);
-    return h * 60 + (m || 0);
-};
+/**
+ * Merge overlapping or adjacent intervals into a single sorted list
+ * Preserves originalStart for slot alignment purposes
+ */
+function mergeIntervals(intervals) {
+    if (intervals.length === 0) return [];
 
-const toTime = m =>
-    `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+    const sorted = intervals.sort((a, b) => a.start - b.start);
+    const merged = [{ ...sorted[0] }];
+
+    for (let i = 1; i < sorted.length; i++) {
+        const last = merged[merged.length - 1];
+        const current = sorted[i];
+
+        if (current.start <= last.end) {
+            // Overlapping or adjacent: merge, keeping earlier originalStart
+            last.end = Math.max(last.end, current.end);
+            if (current.originalStart && (!last.originalStart || current.originalStart < last.originalStart)) {
+                last.originalStart = current.originalStart;
+            }
+        } else {
+            // Gap: add as new interval
+            merged.push({ ...current });
+        }
+    }
+
+    return merged;
+}
+
+/**
+ * Remove a booking interval from a list of available intervals
+ * Handles partial and complete overlaps correctly
+ * Preserves originalStart for slot alignment purposes
+ */
+function subtractInterval(intervals, booking) {
+    const result = [];
+
+    for (const interval of intervals) {
+        // No overlap: keep the entire interval
+        if (booking.end <= interval.start || booking.start >= interval.end) {
+            result.push(interval);
+            continue;
+        }
+
+        // Partial or complete overlap: split the interval
+        // Keep the part before the booking (preserves originalStart)
+        if (booking.start > interval.start) {
+            result.push({
+                originalStart: interval.originalStart,
+                start: interval.start,
+                end: booking.start
+            });
+        }
+
+        // Keep the part after the booking (originalStart still applies)
+        if (booking.end < interval.end) {
+            result.push({
+                originalStart: interval.originalStart,
+                start: booking.end,
+                end: interval.end
+            });
+        }
+    }
+
+    return result;
+}
 
 export async function GET(req) {
     const { searchParams } = new URL(req.url);
-    const date = searchParams.get('date');
+    const date = searchParams.get('date'); // Booker's requested date (YYYY-MM-DD)
     const eventTypeId = searchParams.get('eventTypeId');
     const hostId = searchParams.get('hostId');
+    const bookerTz = searchParams.get('timezone');
 
-    if (!date || !eventTypeId || !hostId) {
-        return NextResponse.json({ error: 'date, eventTypeId & hostId required' }, { status: 400 });
+    if (!date || !eventTypeId || !hostId || !bookerTz) {
+        return NextResponse.json({ error: 'Missing parameters' }, { status: 400 });
     }
 
-    // 1. Get event type details
+    // 1. Fetch Event Type and Host Timezone
     const { data: eventType, error: eventTypeError } = await supabase
         .from('event_types')
-        .select('*')
+        .select('*, users(timezone)')
         .eq('id', eventTypeId)
-        .eq('host_id', hostId)
         .single();
 
-    if (eventTypeError) {
+    if (eventTypeError || !eventType) {
         return NextResponse.json({ error: 'Event type not found' }, { status: 404 });
     }
 
+    const hostTz = eventType.users.timezone;
     const { duration, buffer_before_min, buffer_after_min, min_notice_mins } = eventType;
 
-    // 2. Check minimum notice window
-    const now = new Date();
-    const selectedDate = new Date(date + 'T00:00:00');
-    const minNoticeMs = min_notice_mins * 60 * 1000;
-    const earliestBookingTime = new Date(now.getTime() + minNoticeMs);
+    // 2. Define the Search Window in UTC
+    // Convert booker's calendar date (in their timezone) to UTC boundaries
+    const { start: searchStart, end: searchEnd } = getDayBoundsInUTC(date, bookerTz);
 
-    if (selectedDate < new Date(now.toDateString())) {
-        return NextResponse.json({ date, slots: [] }); // Past date
-    }
+    // 3. Find which host calendar day corresponds to the booker's selected date
+    // Use the midpoint of the booker's day to determine the "primary" host date
+    const getHostDay = (utcTs) => {
+        const d = new Date(utcTs);
+        const s = d.toLocaleString('en-US', {
+            timeZone: hostTz,
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit'
+        }).split('/');
+        return `${s[2]}-${s[0]}-${s[1]}`;
+    };
 
-    const weekday = selectedDate.getDay();
+    // Use midpoint of booker's day to find the primary corresponding host date
+    // This ensures we only show slots from "the same day" in the host's timezone
+    const midPoint = (searchStart + searchEnd) / 2;
+    const primaryHostDate = getHostDay(midPoint);
+    const sortedDates = [primaryHostDate];
 
-    // 3. Fetch Rules, Overrides, and Bookings
+    // 4. Fetch Rules, Overrides, and Bookings for all relevant host dates
+    const weekdays = sortedDates.map(d => new Date(d).getDay());
+
     const [rulesRes, overridesRes, bookingsRes] = await Promise.all([
-        supabase.from('availability_rules').select('*').eq('host_id', hostId).eq('day_of_week', weekday),
-        supabase.from('date_overrides').select('*').eq('host_id', hostId).eq('date', date),
-        supabase.from('bookings').select('*, event_types(buffer_before_min, buffer_after_min)')
-            .eq('host_id', hostId).eq('date', date).eq('status', 'confirmed')
+        supabase
+            .from('availability_rules')
+            .select('*')
+            .eq('host_id', hostId)
+            .in('day_of_week', weekdays),
+        supabase
+            .from('date_overrides')
+            .select('*')
+            .eq('host_id', hostId)
+            .in('date', sortedDates),
+        supabase
+            .from('bookings')
+            .select('*, event_types(buffer_before_min, buffer_after_min)')
+            .eq('host_id', hostId)
+            .in('date', sortedDates)
+            .eq('status', 'confirmed')
     ]);
 
-    if (rulesRes.error) return NextResponse.json({ error: rulesRes.error.message }, { status: 500 });
-    if (overridesRes.error) return NextResponse.json({ error: overridesRes.error.message }, { status: 500 });
-    if (bookingsRes.error) return NextResponse.json({ error: bookingsRes.error.message }, { status: 500 });
-
-    const rules = rulesRes.data;
-    const overrides = overridesRes.data;
-    const bookings = bookingsRes.data;
-
-    let windows = [];
-
-    // 4. Determine base windows
-    if (overrides.length > 0) {
-        const availableOverride = overrides.filter(o => o.is_available);
-        if (availableOverride.length === 0) {
-            return NextResponse.json({ date, slots: [] });
-        }
-        windows = availableOverride.map(o => ({
-            start: toMinutes(o.start_time),
-            end: toMinutes(o.end_time)
-        }));
-    } else {
-        if (rules.length === 0) {
-            return NextResponse.json({ date, slots: [] });
-        }
-        windows = rules.map(r => ({
-            start: toMinutes(r.start_time),
-            end: toMinutes(r.end_time)
-        }));
+    if (rulesRes.error || overridesRes.error || bookingsRes.error) {
+        return NextResponse.json({ error: 'Database error' }, { status: 500 });
     }
 
-    // 5. Subtract bookings with their buffers from windows
-    let availableSegments = [...windows];
+    // 5. Build UTC Availability Intervals
+    let availableIntervals = [];
 
-    for (const booking of bookings) {
-        const bookingBufferBefore = booking.event_types?.buffer_before_min || 0;
-        const bookingBufferAfter = booking.event_types?.buffer_after_min || 0;
+    for (const hostDate of sortedDates) {
+        const dayOfWeek = new Date(hostDate).getDay();
+        const dailyOverrides = overridesRes.data.filter(o => o.date === hostDate);
 
-        const bStart = toMinutes(booking.start_time) - bookingBufferBefore;
-        const bEnd = toMinutes(booking.end_time) + bookingBufferAfter;
+        let dayWindows = [];
 
-        const nextSegments = [];
-        for (const segment of availableSegments) {
-            if (bEnd <= segment.start || bStart >= segment.end) {
-                nextSegments.push(segment);
-            } else {
-                if (bStart > segment.start) {
-                    nextSegments.push({ start: segment.start, end: bStart });
-                }
-                if (bEnd < segment.end) {
-                    nextSegments.push({ start: bEnd, end: segment.end });
-                }
+        if (dailyOverrides.length > 0) {
+            // Use overrides for this specific date
+            const activeOverrides = dailyOverrides.filter(o => o.is_available);
+            dayWindows = activeOverrides.map(o => ({
+                start: zonedTimeToUTC(hostDate, o.start_time_utc, hostTz).getTime(),
+                end: zonedTimeToUTC(hostDate, o.end_time_utc, hostTz).getTime()
+            }));
+        } else {
+            // Use weekly rules for this weekday
+            const dailyRules = rulesRes.data.filter(r => r.day_of_week === dayOfWeek);
+            dayWindows = dailyRules.map(r => ({
+                start: zonedTimeToUTC(hostDate, r.start_time_utc, hostTz).getTime(),
+                end: zonedTimeToUTC(hostDate, r.end_time_utc, hostTz).getTime()
+            }));
+        }
+
+        // Store intervals with BOTH original start (for slot alignment) 
+        // and clipped bounds (for filtering)
+        for (const interval of dayWindows) {
+            const clippedStart = Math.max(interval.start, searchStart);
+            const clippedEnd = Math.min(interval.end, searchEnd);
+            if (clippedStart < clippedEnd) {
+                availableIntervals.push({
+                    originalStart: interval.start,  // For slot stepping alignment
+                    start: clippedStart,            // Clipped for filtering
+                    end: clippedEnd
+                });
             }
         }
-        availableSegments = nextSegments;
     }
 
-    // 6. Generate slots from available segments with buffers
+    // Merge overlapping intervals to create a clean availability window
+    availableIntervals = mergeIntervals(availableIntervals);
+
+    // 6. Subtract Bookings (with buffers) from available intervals
+    for (const booking of bookingsRes.data) {
+        const bBufferBefore = (booking.event_types?.buffer_before_min || 0) * 60000;
+        const bBufferAfter = (booking.event_types?.buffer_after_min || 0) * 60000;
+
+        // Parse booking times in UTC
+        // Bookings are stored as YYYY-MM-DD and HH:mm in UTC
+        const bStart = new Date(`${booking.date}T${booking.start_time_utc}Z`).getTime() - bBufferBefore;
+        const bEnd = new Date(`${booking.date}T${booking.end_time_utc}Z`).getTime() + bBufferAfter;
+
+        availableIntervals = subtractInterval(availableIntervals, { start: bStart, end: bEnd });
+    }
+
+    // 7. Generate Slots
     const slots = [];
-    const totalSlotDuration = duration + buffer_before_min + buffer_after_min;
+    const nowMs = Date.now();
+    const minNoticeMs = min_notice_mins * 60000;
 
-    for (const segment of availableSegments) {
-        let cursor = segment.start;
-        while (cursor + totalSlotDuration <= segment.end) {
-            const slotStartTime = cursor + buffer_before_min; // Actual meeting start
-            const slotEndTime = slotStartTime + duration;
+    // CRITICAL: earliestAllowed is in real UTC time, not booker's wall-clock time
+    const earliestAllowedMs = nowMs + minNoticeMs;
 
-            // Create datetime for minimum notice check
-            const slotDateTime = new Date(date);
-            slotDateTime.setHours(Math.floor(slotStartTime / 60));
-            slotDateTime.setMinutes(slotStartTime % 60);
+    const slotDurationMs = duration * 60000;
+    const bufferBeforeMs = buffer_before_min * 60000;
+    const bufferAfterMs = buffer_after_min * 60000;
+    const totalSlotBlock = slotDurationMs + bufferBeforeMs + bufferAfterMs;
 
-            // Only include slot if it's after minimum notice period
-            if (slotDateTime >= earliestBookingTime) {
+    for (const interval of availableIntervals) {
+        // Calculate slot stepping from the ORIGINAL start (host's actual availability)
+        // This ensures slots stay aligned even when we clip to booker's date window
+        const originalStart = interval.originalStart || interval.start;
+
+        // First potential slot starts at originalStart + buffer_before
+        let cursor = originalStart + bufferBeforeMs;
+
+        // Skip slots until we reach one that's >= clipped interval start
+        while (cursor + slotDurationMs + bufferAfterMs <= interval.end && cursor < interval.start) {
+            cursor += totalSlotBlock;
+        }
+
+        // Generate slots within the clipped interval
+        while (cursor + slotDurationMs + bufferAfterMs <= interval.end) {
+            const sStart = cursor;  // Meeting starts at cursor
+            const sEnd = cursor + slotDurationMs;  // Meeting ends after duration
+
+            // Filter: only include slots on the booker's selected calendar date
+            const slotLocalDate =
+                new Date(sStart).toLocaleDateString('en-CA', { timeZone: bookerTz });
+
+            if (slotLocalDate !== date) {
+                cursor += totalSlotBlock;
+                continue;
+            }
+
+            // CRITICAL: Compare slot start time against current UTC time (nowMs + min_notice)
+            // NOT against booker's wall-clock time
+            if (sStart >= earliestAllowedMs) {
                 slots.push({
-                    start: toTime(slotStartTime),
-                    end: toTime(slotEndTime)
+                    start: formatInTimezone(new Date(sStart), bookerTz),
+                    end: formatInTimezone(new Date(sEnd), bookerTz),
+                    start_utc: new Date(sStart).toISOString()
                 });
             }
 
-            cursor += totalSlotDuration; // Move to next slot position (including buffers)
+            // Move cursor to next potential slot
+            cursor += totalSlotBlock;
         }
     }
 

@@ -12,7 +12,19 @@ export async function POST(req) {
     }
 
     const body = await req.json();
-    const { rules, timezone } = body;
+    const { rules } = body;
+
+    // Fetch user's official timezone from DB
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .select('timezone')
+      .eq('id', user.userId)
+      .single();
+
+    if (userError || !userData) {
+      return Response.json({ error: 'User profile not found' }, { status: 404 });
+    }
+    const timezone = userData.timezone;
 
     const normalizedRules = rules.flatMap(rule => {
       validateRule(rule);
@@ -47,8 +59,8 @@ export async function POST(req) {
         id: randomUUID(),
         host_id: user.userId,
         day_of_week: r.dayOfWeek,
-        start_time: r.startTime,
-        end_time: r.endTime,
+        start_time_utc: r.startTime,
+        end_time_utc: r.endTime,
         timezone: r.timezone
       });
 
@@ -77,7 +89,7 @@ export async function GET(req) {
       .select('*')
       .eq('host_id', user.userId)
       .order('day_of_week')
-      .order('start_time');
+      .order('start_time_utc');
 
     if (error) {
       console.error('Supabase error:', error);

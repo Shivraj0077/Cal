@@ -4,6 +4,21 @@ import React from 'react';
 import { useEffect, useState } from 'react';
 
 export default function EventTypesPage() {
+   function getUserFromToken() {
+      const token = localStorage.getItem("token");
+      if (!token) return null;
+  
+      const payload = token.split(".")[1];
+      const decoded = JSON.parse(atob(payload));
+      return decoded;
+  }
+  
+  useEffect(() => {
+      const user = getUserFromToken();
+      console.log("User id:", user?.userId);
+  }, []);
+
+
   const [eventTypes, setEventTypes] = useState([]);
   const [loading, setLoading] = useState(false);
 

@@ -13,15 +13,28 @@ const toTime = m =>
 
 /**
  * POST /api/bookings
- * body: { hostId, guestName, guestEmail, date, startTime, duration }
+ * body: { hostId, eventTypeId, guestName, guestEmail, startTimeUTC, bookerTimezone }
+ * 
+ * startTimeUTC: ISO 8601 string (e.g., "2026-01-26T05:20:00.000Z")
+ * bookerTimezone: IANA timezone string (e.g., "America/New_York") - stored for reference
  */
 export async function POST(req) {
     try {
-        const { hostId, eventTypeId, guestName, guestEmail, date, startTime } = await req.json();
+        const { hostId, eventTypeId, guestName, guestEmail, startTimeUTC, bookerTimezone } = await req.json();
 
-        if (!hostId || !eventTypeId || !guestName || !guestEmail || !date || !startTime) {
+        if (!hostId || !eventTypeId || !guestName || !guestEmail || !startTimeUTC) {
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
         }
+
+        // Parse the UTC timestamp
+        const bookingDateTime = new Date(startTimeUTC);
+        if (isNaN(bookingDateTime.getTime())) {
+            return NextResponse.json({ error: 'Invalid startTimeUTC format' }, { status: 400 });
+        }
+
+        // Extract date (YYYY-MM-DD) and time (HH:mm) in UTC for storage
+        const date = bookingDateTime.toISOString().split('T')[0];
+        const startTime = bookingDateTime.toISOString().split('T')[1].slice(0, 5);
 
         const { data: eventType, error: eventTypeError } = await supabase
             .from("event_types")
@@ -35,13 +48,14 @@ export async function POST(req) {
 
         const { duration, buffer_before_min, buffer_after_min, min_notice_mins } = eventType;
 
-        //Minimum notice window logic
-        const now = new Date();
-        const bookingDateTime = new Date(date + 'T' + startTime);
+        // Minimum notice window check (comparing UTC times)
+        const nowMs = Date.now();
+        const bookingMs = bookingDateTime.getTime();
         const minNoticeMs = min_notice_mins * 60 * 1000;
-        if (bookingDateTime.getTime() - now.getTime() < minNoticeMs) {
+
+        if (bookingMs - nowMs < minNoticeMs) {
             return NextResponse.json(
-                { error: `Minimum ${minNoticeMs} minutes notice required` },
+                { error: `Minimum ${min_notice_mins} minutes notice required` },
                 { status: 400 });
         }
 
@@ -69,8 +83,8 @@ export async function POST(req) {
             const existingBufferBefore = booking.event_types?.buffer_before_min || 0;
             const existingBufferAfter = booking.event_types?.buffer_after_min || 0;
 
-            const existingStart = toMinutes(booking.start_time) - existingBufferBefore;
-            const existingEnd = toMinutes(booking.end_time) + existingBufferAfter;
+            const existingStart = toMinutes(booking.start_time_utc) - existingBufferBefore;
+            const existingEnd = toMinutes(booking.end_time_utc) + existingBufferAfter;
 
             if (newBookingStart < existingEnd && newBookingEnd > existingStart) {
                 return NextResponse.json({
@@ -90,8 +104,9 @@ export async function POST(req) {
                 guest_name: guestName,
                 guest_email: guestEmail,
                 date: date,
-                start_time: startTime,
-                end_time: endTimeStr,
+                start_time_utc: startTime,
+                end_time_utc: endTimeStr,
+                booker_timezone: bookerTimezone || 'UTC',
                 duration: Number(duration),
                 status: 'confirmed'
             })
@@ -138,23 +153,3 @@ export async function GET(req) {
     return NextResponse.json({ bookings: data });
 }
 
-
-/*
-[
-  {
-    "id": "97d32eb7-6273-4d4e-9db4-a100433c6d13"
-  },
-  {
-    "id": "05c5801e-f2f0-4835-8b8f-1e095a27b188"
-  },
-  {
-    "id": "39f11695-f1ab-4fff-a584-e037112235b4"
-  },
-  {
-    "id": "ed4c6aeb-a7e9-4096-bc30-8081d688f4ee"
-  },
-  {
-    "id": "c343431a-b056-4114-8b33-59d394913917"
-  }
-]
-*/

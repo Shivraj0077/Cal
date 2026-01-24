@@ -13,7 +13,7 @@ export async function GET(req) {
             .select('*')
             .eq('host_id', user.userId)
             .order('day_of_week')
-            .order('start_time');
+            .order('start_time_utc');
 
         if (error) {
             console.error('Supabase error:', error);

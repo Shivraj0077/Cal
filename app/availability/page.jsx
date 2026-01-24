@@ -3,6 +3,20 @@
 import { useEffect, useState } from 'react';
 
 export default function AvailabilityPage() {
+    function getUserFromToken() {
+    const token = localStorage.getItem("token");
+    if (!token) return null;
+
+    const payload = token.split(".")[1];
+    const decoded = JSON.parse(atob(payload));
+    return decoded;
+}
+
+useEffect(() => {
+    const user = getUserFromToken();
+    console.log("User id:", user?.userId);
+}, []);
+
     const [weekly, setWeekly] = useState([]);
     const [overrides, setOverrides] = useState([]);
     const [form, setForm] = useState({
@@ -44,11 +58,13 @@ export default function AvailabilityPage() {
     useEffect(() => {
         (async () => {
             await fetchData()
-        }) ();
+        })();
     }, []);
 
     async function addRule() {
         const token = localStorage.getItem('token');
+        const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
         await fetch('/api/availability', {
             method: 'POST',
             headers: {
@@ -56,7 +72,7 @@ export default function AvailabilityPage() {
                 'Authorization': `Bearer ${token}`
             },
             body: JSON.stringify({
-                timezone: 'Asia/Kolkata',
+                timezone: userTimezone,
                 rules: [
                     {
                         dayOfWeek: form.dayOfWeek,
@@ -72,6 +88,8 @@ export default function AvailabilityPage() {
 
     async function addHoliday() {
         const token = localStorage.getItem('token');
+        const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
         await fetch('/api/availability/overrides', {
             method: 'POST',
             headers: {
@@ -79,7 +97,7 @@ export default function AvailabilityPage() {
                 'Authorization': `Bearer ${token}`
             },
             body: JSON.stringify({
-                timezone: 'Asia/Kolkata',
+                timezone: userTimezone,
                 overrides: [
                     {
                         date: form.date,
@@ -119,7 +137,7 @@ export default function AvailabilityPage() {
             <ul>
                 {weekly.map(r => (
                     <li key={r.id}>
-                        Day {r.day_of_week}: {formatTime(r.start_time)} – {formatTime(r.end_time)}
+                        Day {r.day_of_week}: {formatTime(r.start_time_utc)} – {formatTime(r.end_time_utc)}
                     </li>
                 ))}
             </ul>

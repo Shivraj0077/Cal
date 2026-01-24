@@ -13,7 +13,7 @@ export async function GET(req) {
       .select('*')
       .eq('host_id', user.userId)
       .order('day_of_week')
-      .order('start_time');
+      .order('start_time_utc');
 
     if (weeklyError) {
       console.error('Supabase weekly error:', weeklyError);
@@ -25,7 +25,7 @@ export async function GET(req) {
       .select('*')
       .eq('host_id', user.userId)
       .order('date')
-      .order('start_time');
+      .order('start_time_utc');
 
     if (overridesError) {
       console.error('Supabase overrides error:', overridesError);
