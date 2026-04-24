@@ -10,6 +10,7 @@ const HOST_NAV = [
 
 const BOOKER_NAV = [
     { href: '/dashboard', icon: '📊', label: 'Dashboard' },
+    { href: '/', icon: '🔍', label: 'Find a Host' },
     { href: '/my-bookings', icon: '🗓', label: 'My Bookings' },
 ];
 
