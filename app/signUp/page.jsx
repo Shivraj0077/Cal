@@ -1,123 +1,100 @@
 'use client';
-
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { getAllTimezones } from '@/lib/timezone';
 
 export default function SignupPage() {
   const router = useRouter();
-
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState('HOST');
   const [mounted, setMounted] = useState(false);
-  const [timezone, setTimezone] = useState('UTC'); // Stable default for SSR
+  const [timezone, setTimezone] = useState('UTC');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  // Only compute these on the client side
+  useEffect(() => { setMounted(true); }, []);
   const detectedTimezone = mounted ? Intl.DateTimeFormat().resolvedOptions().timeZone : 'UTC';
   const allTimezones = mounted ? getAllTimezones() : ['UTC'];
-
-  // Set detected timezone once mounted
-  useEffect(() => {
-    if (mounted && timezone === 'UTC') {
-      setTimezone(detectedTimezone);
-    }
-  }, [mounted, detectedTimezone, timezone]);
-  //new browsers :: Intl.DateTimeFormat().resolvedOptions().timeZone();
-  //older browesers :: new Date().getTimezoneOffset();
-  const [error, setError] = useState('');
+  useEffect(() => { if (mounted && timezone === 'UTC') setTimezone(detectedTimezone); }, [mounted, detectedTimezone, timezone]);
 
   async function handleSignup(e) {
     e.preventDefault();
-    setError('');
-
+    setError(''); setLoading(true);
     const res = await fetch('/api/auth/signUp', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        username,
-        password,
-        role,
-        timezone
-      })
+      body: JSON.stringify({ username, password, role, timezone }),
     });
-
     const data = await res.json();
-
-    if (!res.ok) {
-      setError(data.error || 'Signup failed');
-      return;
-    }
-
+    setLoading(false);
+    if (!res.ok) { setError(data.error || 'Signup failed'); return; }
     localStorage.setItem('token', data.token);
-    router.push('/'); // redirect after signup
-
-    if (res.ok) {
-      router.push("/signIn");
-    }
-  }
-
-  async function handleLogin() {
-    router.push("/signIn");
+    router.push('/signIn');
   }
 
   return (
-    <div style={{ maxWidth: 400, margin: '40px auto' }}>
-      <h2>Signup</h2>
-
-      <form onSubmit={handleSignup}>
-        <input
-          placeholder="Email"
-          value={username}
-          onChange={e => setUsername(e.target.value)}
-          required
-        />
-
-        <input
-          type="password"
-          placeholder="Password"
-          value={password}
-          onChange={e => setPassword(e.target.value)}
-          required
-        />
-
-        <select value={role} onChange={e => setRole(e.target.value)}>
-          <option value="HOST">Host</option>
-          <option value="BOOKER">Booker</option>
-        </select>
-
-        <div style={{ marginBottom: 15 }}>
-          <label style={{ display: 'block', fontSize: '14px', color: '#666', marginBottom: '5px' }}>
-            Your Timezone
-          </label>
-          <select
-            value={timezone}
-            onChange={e => setTimezone(e.target.value)}
-            style={{ width: '100%', padding: '8px' }}
-            disabled={!mounted}
-          >
-            {allTimezones.map(tz => (
-              <option key={tz} value={tz}>{tz}</option>
-            ))}
-          </select>
-          <small style={{ color: '#888' }}>
-            {mounted ? 'Auto-detected. Change if needed.' : 'Detecting timezone...'}
-          </small>
+    <div className="auth-page">
+      <div className="auth-box">
+        <div className="auth-logo">
+          <div className="auth-logo-icon">📅</div>
+          <span className="auth-logo-text">BookWise</span>
         </div>
 
-        <button type="submit">Create Account</button>
-      </form>
+        <div className="auth-card">
+          <h1 className="auth-title">Create your account</h1>
+          <p className="auth-subtitle">Start accepting bookings in minutes</p>
 
-      <button onClick={handleLogin}>SingIn</button>
+          {error && <div className="alert-error">{error}</div>}
 
-      {error && <p style={{ color: 'red' }}>{error}</p>}
+          <form onSubmit={handleSignup}>
+            <div className="field">
+              <label className="label">Username</label>
+              <input className="input input-full" placeholder="your_username" value={username}
+                onChange={e => setUsername(e.target.value)} required autoFocus />
+            </div>
+            <div className="field">
+              <label className="label">Password</label>
+              <input className="input input-full" type="password" placeholder="••••••••" value={password}
+                onChange={e => setPassword(e.target.value)} required />
+            </div>
+
+            {/* Role */}
+            <div className="field">
+              <label className="label">I am a…</label>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                {[['HOST', '🗓', 'Host', 'I share my calendar'], ['BOOKER', '🔍', 'Booker', 'I book meetings']].map(([val, icon, lbl, sub]) => (
+                  <button key={val} type="button" onClick={() => setRole(val)} style={{
+                    padding: '10px 12px', textAlign: 'left', borderRadius: 6, cursor: 'pointer',
+                    background: role === val ? '#eff6ff' : '#f9fafb',
+                    border: `1px solid ${role === val ? '#2563eb' : '#e5e7eb'}`,
+                  }}>
+                    <div style={{ fontSize: '1.1rem', marginBottom: 3 }}>{icon}</div>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: role === val ? '#2563eb' : '#111827' }}>{lbl}</div>
+                    <div style={{ fontSize: 11, color: '#9ca3af' }}>{sub}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="field">
+              <label className="label">Timezone {mounted && <span style={{ color: '#9ca3af', fontWeight: 400 }}>· auto-detected</span>}</label>
+              <select className="input input-full" value={timezone} onChange={e => setTimezone(e.target.value)} disabled={!mounted}>
+                {allTimezones.map(tz => <option key={tz} value={tz}>{tz}</option>)}
+              </select>
+            </div>
+
+            <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: 4 }} disabled={loading}>
+              {loading ? 'Creating account…' : 'Create account'}
+            </button>
+          </form>
+        </div>
+
+        <div className="auth-footer">
+          Already have an account?{' '}
+          <button onClick={() => router.push('/signIn')}>Sign in</button>
+        </div>
+      </div>
     </div>
   );
 }
-
-
-

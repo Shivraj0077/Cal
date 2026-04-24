@@ -1,60 +1,65 @@
 'use client';
-
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 export default function LoginPage() {
   const router = useRouter();
-
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
   async function handleLogin(e) {
     e.preventDefault();
-    setError('');
-
+    setError(''); setLoading(true);
     const res = await fetch('/api/auth/signIn', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password })
+      body: JSON.stringify({ username, password }),
     });
-
     const data = await res.json();
-
-    if (!res.ok) {
-      setError(data.error || 'Login failed');
-      return;
-    }
-
+    setLoading(false);
+    if (!res.ok) { setError(data.error || 'Login failed'); return; }
     localStorage.setItem('token', data.token);
-    router.push('/dashboard');
+    router.push('/event-types');
   }
 
   return (
-    <div style={{ maxWidth: 400, margin: '40px auto' }}>
-      <h2>Login</h2>
+    <div className="auth-page">
+      <div className="auth-box">
+        <div className="auth-logo">
+          <div className="auth-logo-icon">📅</div>
+          <span className="auth-logo-text">BookWise</span>
+        </div>
 
-      <form onSubmit={handleLogin}>
-        <input
-          placeholder="Username"
-          value={username}
-          onChange={e => setUsername(e.target.value)}
-          required
-        />
+        <div className="auth-card">
+          <h1 className="auth-title">Welcome back</h1>
+          <p className="auth-subtitle">Sign in to your BookWise account</p>
 
-        <input
-          type="password"
-          placeholder="Password"
-          value={password}
-          onChange={e => setPassword(e.target.value)}
-          required
-        />
+          {error && <div className="alert-error">{error}</div>}
 
-        <button type="submit">Login</button>
-      </form>
+          <form onSubmit={handleLogin}>
+            <div className="field">
+              <label className="label">Username</label>
+              <input className="input input-full" placeholder="your_username" value={username}
+                onChange={e => setUsername(e.target.value)} required autoFocus />
+            </div>
+            <div className="field">
+              <label className="label">Password</label>
+              <input className="input input-full" type="password" placeholder="••••••••" value={password}
+                onChange={e => setPassword(e.target.value)} required />
+            </div>
+            <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: 4 }} disabled={loading}>
+              {loading ? 'Signing in…' : 'Sign in'}
+            </button>
+          </form>
+        </div>
 
-      {error && <p style={{ color: 'red' }}>{error}</p>}
+        <div className="auth-footer">
+          Don't have an account?{' '}
+          <button onClick={() => router.push('/signUp')}>Create one</button>
+        </div>
+      </div>
     </div>
   );
 }
