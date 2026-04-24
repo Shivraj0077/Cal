@@ -68,21 +68,33 @@ export default function AvailabilityPage() {
             <Sidebar />
             <main className="main">
                 <div className="breadcrumb">
-                    🏠 <span>/</span> Settings <span>/</span> <span>Working Hours</span>
+                    Home <span>/</span> Settings <span>/</span> <span>Working Hours</span>
                 </div>
 
                 <div className="page-header">
-                    <h1 className="page-title">Availability</h1>
+                    Settings / Working Hours
+                </div>
+
+                <div className="page-header" style={{ marginBottom: 32 }}>
+                    <div>
+                        <h1 className="page-title">Availability</h1>
+                        <p className="page-subtitle">Set your weekly schedule and working hours.</p>
+                    </div>
                     <button className="btn btn-primary" onClick={save} disabled={saving}>
-                        {saved ? '✓ Saved' : saving ? 'Saving...' : 'Save Changes'}
+                        {saved ? 'Saved' : saving ? 'Saving...' : 'Save Changes'}
                     </button>
                 </div>
 
                 <div className="calendar-layout">
                     <div className="mini-cal" style={{ gridColumn: 'span 2' }}>
-                        <div style={{ padding: '0 8px 16px', borderBottom: '1px solid #eaecef', marginBottom: 24 }}>
-                            <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>Default Working Hours</h3>
-                            <p style={{ fontSize: 13, color: '#6e6e73' }}>These hours will be applied to all your events by default.</p>
+                        <div className="card-outer" style={{ marginBottom: 24 }}>
+                            <div className="card-header-inner">
+                                <h3 style={{ margin: 0, fontSize: 13, fontWeight: 700 }}>Your Timezone</h3>
+                            </div>
+                            <div style={{ padding: 20 }}>
+                                <div style={{ fontSize: 13 }}>Current preference: <strong>{timezone}</strong></div>
+                                <div style={{ fontSize: 11, color: '#6e6e73', marginTop: 8 }}>All availability is stored in UTC and converted automatically.</div>
+                            </div>
                         </div>
                         
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -123,18 +135,6 @@ export default function AvailabilityPage() {
                                     )}
                                 </div>
                             ))}
-                        </div>
-
-                        <div style={{ marginTop: 40, paddingTop: 24, borderTop: '1px solid #eaecef' }}>
-                            <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 8 }}>Timezone</h3>
-                            <select 
-                                className="btn" 
-                                value={timezone} 
-                                onChange={e => setTimezone(e.target.value)}
-                                style={{ width: '100%', maxWidth: 400 }}
-                            >
-                                <option value={timezone}>{timezone}</option>
-                            </select>
                         </div>
                     </div>
                 </div>

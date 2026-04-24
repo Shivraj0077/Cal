@@ -27,7 +27,20 @@ export default function BookingPage({ params }) {
     useEffect(() => { setMounted(true); }, []);
     const detectedTz = mounted ? Intl.DateTimeFormat().resolvedOptions().timeZone : 'UTC';
     const allTimezones = mounted ? getAllTimezones() : ['UTC'];
-    useEffect(() => { if (mounted && timezone === 'UTC') setTimezone(detectedTz); }, [mounted, detectedTz, timezone]);
+    
+    useEffect(() => { 
+        if (mounted && timezone === 'UTC') setTimezone(detectedTz); 
+        
+        // Auto-fill guest info if logged in
+        const storedUser = localStorage.getItem('user');
+        if (storedUser) {
+            try {
+                const u = JSON.parse(storedUser);
+                setGuestName(u.username);
+                setGuestEmail(u.username.includes('@') ? u.username : u.username + '@example.com');
+            } catch (e) {}
+        }
+    }, [mounted, detectedTz, timezone]);
 
     useEffect(() => {
         fetch(`/api/event-types?hostId=${hostId}`).then(r => r.json()).then(d => setEventTypes(Array.isArray(d) ? d : []));
@@ -56,12 +69,14 @@ export default function BookingPage({ params }) {
 
     if (bookingStatus === 'success') return (
         <div className="booking-page">
-            <div style={{ textAlign: 'center', maxWidth: 440 }}>
-                <div style={{ width: 56, height: 56, background: '#f0fdf4', border: '2px solid #16a34a', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem', margin: '0 auto 20px' }}>✓</div>
-                <h2 style={{ fontWeight: 800, fontSize: '1.3rem', marginBottom: 8 }}>This meeting is scheduled</h2>
-                <p style={{ color: '#6b7280', marginBottom: 4 }}><strong style={{ color: '#111' }}>{selectedType?.title}</strong></p>
-                <p style={{ color: '#9ca3af', fontSize: 13, marginBottom: 4 }}>{date} · {fmt(selectedSlot?.start)} · {timezone}</p>
-                <p style={{ color: '#9ca3af', fontSize: 13, marginBottom: 24 }}>Confirmation sent to {guestEmail}</p>
+            <div className="card-outer" style={{ textAlign: 'center', padding: '60px 40px' }}>
+                <div style={{ fontWeight: 800, fontSize: 46, letterSpacing: '-0.04em', marginBottom: 12 }}>Booking Confirmed</div>
+                <p style={{ color: '#6e6e73', marginBottom: 32 }}>We&apos;ve sent an invitation to your email address.</p>
+                <div style={{ borderTop: '1px solid #eaecef', paddingTop: 24, display: 'inline-block', textAlign: 'left' }}>
+                    <p style={{ color: '#6b7280', marginBottom: 4 }}><strong style={{ color: '#111' }}>{selectedType?.title}</strong></p>
+                    <p style={{ color: '#9ca3af', fontSize: 18.7, marginBottom: 4 }}>{date} · {fmt(selectedSlot?.start)} · {timezone}</p>
+                    <p style={{ color: '#9ca3af', fontSize: 18.7, marginBottom: 24 }}>Confirmation sent to {guestEmail}</p>
+                </div>
                 <button className="btn btn-secondary" onClick={reset}>Book another</button>
             </div>
         </div>
@@ -71,26 +86,25 @@ export default function BookingPage({ params }) {
         <div className="booking-page">
             {/* Logo */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 32 }}>
-                <div style={{ width: 28, height: 28, background: '#111827', borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14 }}>📅</div>
-                <span style={{ fontWeight: 700, fontSize: '1rem' }}>BookWise</span>
+                <span style={{ fontWeight: 700, fontSize: '1.44rem' }}>BookWise</span>
             </div>
 
             <div style={{ width: '100%', maxWidth: 520 }}>
                 {/* STEP 1 — Pick event type */}
                 {!selectedType && (
                     <div>
-                        <h1 style={{ fontWeight: 700, fontSize: '1.1rem', marginBottom: 4 }}>Choose a meeting type</h1>
-                        <p style={{ fontSize: 13, color: '#6b7280', marginBottom: 20 }}>Select the type of meeting you&apos;d like to book.</p>
+                        <h1 style={{ fontWeight: 700, fontSize: '1.58rem', marginBottom: 4 }}>Choose a meeting type</h1>
+                        <p style={{ fontSize: 18.7, color: '#6b7280', marginBottom: 20 }}>Select the type of meeting you&apos;d like to book.</p>
                         {eventTypes.length === 0 && <div className="card"><div className="empty"><div className="empty-desc">This host hasn&apos;t set up any event types yet.</div></div></div>}
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                             {eventTypes.map(type => (
                                 <div key={type.id} className="card list-row" style={{ cursor: 'pointer' }} onClick={() => setSelectedType(type)}>
                                     <div style={{ flex: 1 }}>
-                                        <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 4 }}>{type.title}</div>
-                                        {type.description && <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 6 }}>{type.description}</div>}
-                                        <span className="badge badge-gray"><span style={{ fontSize: 10 }}>⏱</span> {type.duration}m</span>
+                                        <div style={{ fontWeight: 600, fontSize: 20, marginBottom: 4 }}>{type.title}</div>
+                                        {type.description && <div style={{ fontSize: 17.3, color: '#6b7280', marginBottom: 6 }}>{type.description}</div>}
+                                        <span className="badge badge-gray">{type.duration}m</span>
                                     </div>
-                                    <span style={{ color: '#9ca3af', fontSize: 18 }}>›</span>
+                                    <span style={{ color: '#9ca3af', fontSize: 21.6 }}>&gt;</span>
                                 </div>
                             ))}
                         </div>
@@ -101,10 +115,10 @@ export default function BookingPage({ params }) {
                 {selectedType && !selectedSlot && (
                     <div>
                         <button className="btn btn-ghost btn-sm" style={{ marginBottom: 16, paddingLeft: 0 }} onClick={() => { setSelectedType(null); setSlots([]); setDate(''); }}>
-                            ← Back
+                            Back
                         </button>
-                        <h1 style={{ fontWeight: 700, fontSize: '1.1rem', marginBottom: 2 }}>{selectedType.title}</h1>
-                        <p style={{ fontSize: 13, color: '#6b7280', marginBottom: 20 }}>{selectedType.duration} min · Select a date and time</p>
+                        <h1 style={{ fontWeight: 700, fontSize: '1.32rem', marginBottom: 2 }}>{selectedType.title}</h1>
+                        <p style={{ fontSize: 15.6, color: '#6b7280', marginBottom: 20 }}>{selectedType.duration} min · Select a date and time</p>
 
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }}>
                             <div>
@@ -121,10 +135,10 @@ export default function BookingPage({ params }) {
                         </div>
 
                         <div className="card" style={{ padding: 20 }}>
-                            <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 12 }}>Available times</div>
-                            {!date && <p style={{ fontSize: 13, color: '#9ca3af' }}>Select a date to see available slots.</p>}
-                            {date && loading && <p style={{ fontSize: 13, color: '#9ca3af' }}>Loading slots…</p>}
-                            {date && !loading && slots.length === 0 && <p style={{ fontSize: 13, color: '#9ca3af' }}>No slots available on this day.</p>}
+                            <div style={{ fontWeight: 600, fontSize: 15.6, marginBottom: 12 }}>Available times</div>
+                            {!date && <p style={{ fontSize: 15.6, color: '#9ca3af' }}>Select a date to see available slots.</p>}
+                            {date && loading && <p style={{ fontSize: 15.6, color: '#9ca3af' }}>Loading slots…</p>}
+                            {date && !loading && slots.length === 0 && <p style={{ fontSize: 15.6, color: '#9ca3af' }}>No slots available on this day.</p>}
                             {!loading && slots.length > 0 && (
                                 <div className="slot-grid">
                                     {slots.map((slot, i) => (
@@ -140,15 +154,15 @@ export default function BookingPage({ params }) {
                 {selectedType && selectedSlot && bookingStatus !== 'success' && (
                     <div>
                         <button className="btn btn-ghost btn-sm" style={{ marginBottom: 16, paddingLeft: 0 }} onClick={() => { setSelectedSlot(null); setBookingError(''); setBookingStatus(null); }}>
-                            ← Change time
+                            Change time
                         </button>
-                        <h1 style={{ fontWeight: 700, fontSize: '1.1rem', marginBottom: 16 }}>Your details</h1>
+                        <h1 style={{ fontWeight: 700, fontSize: '1.32rem', marginBottom: 16 }}>Your details</h1>
 
                         {/* Summary */}
                         <div className="card" style={{ padding: 16, marginBottom: 20, background: '#f9fafb' }}>
-                            <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 4 }}>{selectedType.title}</div>
-                            <div style={{ fontSize: 13, color: '#6b7280' }}>📅 {date} · ⏰ {fmt(selectedSlot.start)} – {fmt(selectedSlot.end)}</div>
-                            <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>🌍 {timezone}</div>
+                            <div style={{ fontWeight: 600, fontSize: 15.6, marginBottom: 4 }}>{selectedType.title}</div>
+                            <div style={{ fontSize: 15.6, color: '#6b7280' }}>Date: {date} · Time: {fmt(selectedSlot.start)} – {fmt(selectedSlot.end)}</div>
+                            <div style={{ fontSize: 14.4, color: '#9ca3af', marginTop: 2 }}>Timezone: {timezone}</div>
                         </div>
 
                         {bookingError && <div className="alert-error">{bookingError}</div>}

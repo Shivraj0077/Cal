@@ -60,76 +60,84 @@ export default function EventTypesPage() {
     <div className="shell">
       <Sidebar />
       <main className="main">
-        <div className="page-wrap">
-          {/* Page header */}
-          <div className="page-topbar">
+        <div className="page-wrap-v2">
+
+          {/* Header */}
+          <div className="topbar-v2">
             <div>
-              <div className="page-title">Event types</div>
-              <div className="page-desc">Configure different events for people to book on your calendar.</div>
+              <h1 className="title-v2">Event types</h1>
+              <p className="desc-v2">Manage booking configurations</p>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <input className="input" placeholder="🔍  Search" style={{ width: 180 }} />
-              <button className="btn btn-primary" onClick={() => setShowForm(v => !v)}>+ New</button>
+
+            <div className="actions-v2">
+              <button className="btn-primary-v2" onClick={() => setShowForm(v => !v)}>
+                + New Event
+              </button>
             </div>
           </div>
 
-          {/* Create form */}
+          {/* Form */}
           {showForm && (
-            <div className="card" style={{ marginBottom: 16, padding: 20 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                <span style={{ fontWeight: 600, fontSize: 14 }}>New event type</span>
-                <button className="btn-icon" onClick={() => setShowForm(false)}>✕</button>
+            <div className="form-card-v2">
+              <div className="form-header">
+                <span>Create new event</span>
+                <button onClick={() => setShowForm(false)}>✕</button>
               </div>
-              <form onSubmit={create}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 20px' }}>
-                  <div className="field" style={{ gridColumn: '1/-1' }}>
-                    <label className="label">Title *</label>
-                    <input className="input input-full" placeholder="e.g. 30 Min Meeting" value={form.title}
-                      onChange={e => setForm({ ...form, title: e.target.value })} required autoFocus />
-                  </div>
-                  <div className="field" style={{ gridColumn: '1/-1' }}>
-                    <label className="label">Description <span style={{ color: '#9ca3af', fontWeight: 400 }}>· optional</span></label>
-                    <input className="input input-full" placeholder="Brief description for bookers" value={form.description}
-                      onChange={e => setForm({ ...form, description: e.target.value })} />
-                  </div>
 
-                  {/* Duration presets */}
-                  <div className="field" style={{ gridColumn: '1/-1' }}>
-                    <label className="label">Duration</label>
-                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                      {DURATIONS.map(d => (
-                        <button key={d} type="button" onClick={() => setForm({ ...form, duration: d })} style={{
-                          padding: '6px 14px', borderRadius: 6, fontSize: 13, fontWeight: 500, cursor: 'pointer',
-                          background: form.duration === d ? '#111827' : '#f9fafb',
-                          color: form.duration === d ? '#fff' : '#374151',
-                          border: `1px solid ${form.duration === d ? '#111827' : '#e5e7eb'}`,
-                        }}>
-                          {d} min
-                        </button>
-                      ))}
-                    </div>
-                  </div>
+              <form onSubmit={create} className="form-grid-v2">
 
-                  <div className="field">
-                    <label className="label">Buffer before (min)</label>
-                    <input className="input input-full" type="number" min={0} value={form.bufferBefore}
-                      onChange={e => setForm({ ...form, bufferBefore: e.target.value })} />
-                  </div>
-                  <div className="field">
-                    <label className="label">Buffer after (min)</label>
-                    <input className="input input-full" type="number" min={0} value={form.bufferAfter}
-                      onChange={e => setForm({ ...form, bufferAfter: e.target.value })} />
-                  </div>
-                  <div className="field" style={{ gridColumn: '1/-1' }}>
-                    <label className="label">Minimum notice (min)</label>
-                    <input className="input" style={{ width: 200 }} type="number" min={0} value={form.minNotice}
-                      onChange={e => setForm({ ...form, minNotice: e.target.value })} />
-                    <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>e.g. 120 = bookers must book ≥2h in advance</div>
-                  </div>
+                <input
+                  placeholder="Event title"
+                  value={form.title}
+                  onChange={e => setForm({ ...form, title: e.target.value })}
+                  required
+                />
+
+                <input
+                  placeholder="Description"
+                  value={form.description}
+                  onChange={e => setForm({ ...form, description: e.target.value })}
+                />
+
+                <div className="duration-row">
+                  {DURATIONS.map(d => (
+                    <button
+                      key={d}
+                      type="button"
+                      className={form.duration === d ? "active" : ""}
+                      onClick={() => setForm({ ...form, duration: d })}
+                    >
+                      {d}m
+                    </button>
+                  ))}
                 </div>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button type="submit" className="btn btn-primary btn-sm" disabled={saving}>{saving ? 'Creating…' : 'Create'}</button>
-                  <button type="button" className="btn btn-ghost btn-sm" onClick={() => setShowForm(false)}>Cancel</button>
+
+                <div className="grid-2">
+                  <input
+                    type="number"
+                    placeholder="Buffer before"
+                    value={form.bufferBefore}
+                    onChange={e => setForm({ ...form, bufferBefore: e.target.value })}
+                  />
+                  <input
+                    type="number"
+                    placeholder="Buffer after"
+                    value={form.bufferAfter}
+                    onChange={e => setForm({ ...form, bufferAfter: e.target.value })}
+                  />
+                </div>
+
+                <input
+                  type="number"
+                  placeholder="Minimum notice (mins)"
+                  value={form.minNotice}
+                  onChange={e => setForm({ ...form, minNotice: e.target.value })}
+                />
+
+                <div className="form-actions">
+                  <button type="submit" className="btn-primary-v2" disabled={saving}>
+                    {saving ? 'Creating...' : 'Create'}
+                  </button>
                 </div>
               </form>
             </div>
@@ -137,50 +145,43 @@ export default function EventTypesPage() {
 
           {/* List */}
           {loading ? (
-            <div className="card"><div className="empty"><div className="empty-desc">Loading…</div></div></div>
+            <div className="card-v2 center">Loading...</div>
           ) : eventTypes.length === 0 && !showForm ? (
-            <div className="card">
-              <div className="empty">
-                <div className="empty-title">No event types yet</div>
-                <div className="empty-desc" style={{ marginBottom: 14 }}>Create your first to start accepting bookings</div>
-                <button className="btn btn-primary btn-sm" onClick={() => setShowForm(true)}>+ New event type</button>
-              </div>
+            <div className="card-v2 center">
+              <h3 style={{ marginBottom: 12 }}>No events yet</h3>
+              <button className="btn-primary-v2" onClick={() => setShowForm(true)}>
+                Create first
+              </button>
             </div>
           ) : (
-            <div className="card">
-              {eventTypes.map((type, i) => (
-                <div key={type.id} className="list-row">
-                  {/* Left: info */}
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
-                      <span style={{ fontWeight: 600, fontSize: 14 }}>{type.title}</span>
-                      <span style={{ fontSize: 11, color: '#9ca3af' }}>/book/</span>
-                    </div>
-                    <div style={{ display: 'flex', align: 'center', gap: 6 }}>
-                      <span className="badge badge-gray">
-                        <span style={{ fontSize: 10 }}>⏱</span> {type.duration}m
-                      </span>
-                      {type.buffer_before_min > 0 && <span className="badge badge-gray">{type.buffer_before_min}m before</span>}
-                      {type.buffer_after_min > 0 && <span className="badge badge-gray">{type.buffer_after_min}m after</span>}
+            <div className="list-v2">
+              {eventTypes.map(type => (
+                <div key={type.id} className="event-row-v2">
+
+                  <div className="event-left">
+                    <div className="event-title">{type.title}</div>
+                    <div className="event-meta">
+                      {type.duration}m
+                      {type.buffer_before_min > 0 && ` · ${type.buffer_before_min}m before`}
+                      {type.buffer_after_min > 0 && ` · ${type.buffer_after_min}m after`}
                     </div>
                   </div>
 
-                  {/* Right: toggle + actions */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <label className="toggle">
+                  <div className="event-actions">
+                    <label className="switch">
                       <input type="checkbox" defaultChecked />
-                      <span className="toggle-slider" />
+                      <span />
                     </label>
-                    <button className="btn-icon" title="External link">↗</button>
-                    <button className="btn-icon" title="Copy link">⎘</button>
-                    <button className="btn-icon" title="More">•••</button>
                   </div>
+
                 </div>
               ))}
             </div>
           )}
+
         </div>
       </main>
     </div>
   );
 }
+

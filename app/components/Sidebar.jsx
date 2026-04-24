@@ -1,28 +1,20 @@
 'use client';
-import { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-
-const GENERAL_NAV = [
-    { href: '/dashboard', icon: '📊', label: 'Dashboard' },
-    { href: '/availability', icon: '🗓', label: 'Calendar' }, // Reusing availability as a "Calendar" placeholder for hosts
-    { href: '/event-types', icon: '⊞', label: 'Event Types' },
-];
-
-const OTHER_NAV = [
-    { href: '/settings', icon: '⚙', label: 'Settings' },
-];
 
 export default function Sidebar() {
     const router = useRouter();
     const pathname = usePathname();
-    const [user] = useState(() => {
-        if (typeof window === 'undefined') return null;
+    const [user, setUser] = useState(null);
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => {
+        setMounted(true);
         const storedUser = localStorage.getItem('user');
         if (storedUser) {
-            try { return JSON.parse(storedUser); } catch (e) { return null; }
+            try { setUser(JSON.parse(storedUser)); } catch (e) {}
         }
-        return null;
-    });
+    }, []);
 
     function logout() {
         localStorage.removeItem('token');
@@ -30,18 +22,42 @@ export default function Sidebar() {
         router.push('/signIn');
     }
 
+    if (!mounted) return (
+        <aside className="sidebar">
+            <div className="sidebar-logo"><span>BookWise</span></div>
+        </aside>
+    );
+
     const nameToDisplay = user?.username || 'User';
     const initials = nameToDisplay.slice(0, 2).toUpperCase();
 
+    const HOST_NAV = [
+        { href: '/event-types', icon: '', label: 'Event types' },
+        { href: '/my-bookings', icon: '', label: 'Bookings' },
+        { href: '/availability', icon: '', label: 'Availability' },
+    ];
+
+    const BOOKER_NAV = [
+        { href: '/dashboard', icon: '', label: 'Dashboard' },
+        { href: '/my-bookings', icon: '', label: 'My Bookings' },
+        { href: '/', icon: '', label: 'Find a Host' },
+    ];
+
+    const navItems = user?.role === 'BOOKER' ? BOOKER_NAV : HOST_NAV;
+
     return (
         <aside className="sidebar">
-            <div className="sidebar-logo">
-                <span style={{ fontSize: 24 }}>📅</span> <span>BookWise</span>
+            {/* User Profile at Top */}
+            <div className="sidebar-user-top">
+                <div className="sidebar-avatar-small">{initials}</div>
+                <div className="sidebar-user-details">
+                    <div className="sidebar-user-name-top">{nameToDisplay}</div>
+                </div>
+                <div className="sidebar-search-icon">Search</div>
             </div>
 
-            <div className="sidebar-section-label">General</div>
-            <nav className="sidebar-nav">
-                {GENERAL_NAV.map(item => (
+            <nav className="sidebar-nav" style={{ marginTop: 20 }}>
+                {navItems.map(item => (
                     <button
                         key={item.href}
                         className={`nav-item ${pathname === item.href ? 'active' : ''}`}
@@ -53,30 +69,17 @@ export default function Sidebar() {
                 ))}
             </nav>
 
-            <div className="sidebar-section-label">Other</div>
-            <nav className="sidebar-nav">
-                {OTHER_NAV.map(item => (
-                    <button
-                        key={item.href}
-                        className={`nav-item ${pathname === item.href ? 'active' : ''}`}
-                        onClick={() => router.push(item.href)}
-                    >
-                        <span className="nav-icon">{item.icon}</span>
-                        {item.label}
-                    </button>
-                ))}
-                <button className="nav-item" onClick={logout} style={{ color: '#ef4444' }}>
-                    <span className="nav-icon">⎋</span>
+            <div style={{ flex: 1 }}></div>
+
+            {/* Bottom Actions */}
+            <div className="sidebar-bottom">
+               
+                <button className="nav-item-small" onClick={() => router.push('/settings')}>
+                    Settings
+                </button>
+                <button className="nav-item-small" onClick={logout} style={{ color: '#ef4444', marginTop: 8 }}>
                     Sign out
                 </button>
-            </nav>
-
-            <div className="sidebar-user-anchor">
-                <div className="sidebar-avatar" style={{ width: 36, height: 36, fontSize: 13 }}>{initials}</div>
-                <div className="sidebar-user-info">
-                    <div className="sidebar-user-name">{nameToDisplay}</div>
-                    <div className="sidebar-user-email">{user?.role?.toLowerCase() || 'user'}</div>
-                </div>
             </div>
         </aside>
     );
